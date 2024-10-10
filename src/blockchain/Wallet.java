@@ -38,6 +38,7 @@ public class Wallet {
 
 	public float getBalance(Map<String, TransactionOutput> UTXOs) {
 		float total = 0;
+		// 내가 가진 금액만 골라서 금액을 더하고 내역을 저장
 		for (Map.Entry<String, TransactionOutput> item : UTXOs.entrySet()) {
 			TransactionOutput UTXO = item.getValue();
 			if (UTXO.isMine(publicKey)) {
@@ -49,12 +50,14 @@ public class Wallet {
 	}
 
 	public Transaction sendFunds(PublicKey _recipient, float value, Map<String, TransactionOutput> UTXOs) {
+		// 잔액이 부족하면 거래 거절
 		if (getBalance(UTXOs) < value) {
 			System.out.println("#Not Enough funds to send transaction. Transaction Discarded.");
 			return null;
 		}
 		ArrayList<TransactionInput> inputs = new ArrayList<TransactionInput>();
 
+		// 이전까지의 거래내역 inputs에 저장
 		float total = 0;
 		for (Map.Entry<String, TransactionOutput> item : wUTXOs.entrySet()) {
 			TransactionOutput UTXO = item.getValue();
@@ -64,6 +67,7 @@ public class Wallet {
 				break;
 		}
 
+		// 새로운 트랜잭션을 생성하고 서명
 		Transaction newTransaction = new Transaction(publicKey, _recipient, value, inputs);
 		newTransaction.generateSignature(privateKey);
 

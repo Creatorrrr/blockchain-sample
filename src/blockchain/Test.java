@@ -16,20 +16,21 @@ public class Test {
 	public static Wallet walletB;
 	public static float minimumTransaction = 0.1f;
 	public static Transaction genesisTransaction;
-	
+
 	public static void main(String[] args) {
 		Security.addProvider(new BouncyCastleProvider());
 
 		walletA = new Wallet();
 		walletB = new Wallet();
 		Wallet coinbase = new Wallet();
-		
+
 		genesisTransaction = new Transaction(coinbase.publicKey, walletA.publicKey, 100f, null);
 		genesisTransaction.generateSignature(coinbase.privateKey);
 		genesisTransaction.transactionId = "0";
-		genesisTransaction.outputs.add(new TransactionOutput(genesisTransaction.recipient, genesisTransaction.value, genesisTransaction.transactionId));
+		genesisTransaction.outputs.add(new TransactionOutput(genesisTransaction.recipient, genesisTransaction.value,
+				genesisTransaction.transactionId));
 		UTXOs.put(genesisTransaction.outputs.get(0).id, genesisTransaction.outputs.get(0));
-		
+
 		// 최초 블록 생성
 		System.out.println("Creating and Mining Genesis block");
 		Block genesis = new Block("0");
@@ -41,28 +42,29 @@ public class Test {
 		System.out.println("\nWalletA's balance is: " + walletA.getBalance(UTXOs));
 		System.out.println("\nWalletA is Attempting to send funds (40) to WalletB...");
 		block1.addTransaction(walletA.sendFunds(walletB.publicKey, 40f, UTXOs), UTXOs, minimumTransaction);
-		
+
 		addBlock(block1);
 		System.out.println("\nWalletA's balance is: " + walletA.getBalance(UTXOs));
 		System.out.println("WalletB's balance is: " + walletB.getBalance(UTXOs));
-		
+
 		Block block2 = new Block(block1.hash);
 		System.out.println("\nWalletA Attempting to send more funds (1000) than it has...");
 		block2.addTransaction(walletA.sendFunds(walletB.publicKey, 1000f, UTXOs), UTXOs, minimumTransaction);
-		
+
 		addBlock(block2);
 		System.out.println("\nWalletA's balance is: " + walletA.getBalance(UTXOs));
 		System.out.println("WalletB's balance is: " + walletB.getBalance(UTXOs));
-		
+
 		Block block3 = new Block(block2.hash);
 		System.out.println("\nWalletB is Attempting to send funds (20) to WalletA...");
-		block3.addTransaction(walletB.sendFunds( walletA.publicKey, 20, UTXOs), UTXOs, minimumTransaction);
-		
+		block3.addTransaction(walletB.sendFunds(walletA.publicKey, 20, UTXOs), UTXOs, minimumTransaction);
+
 		addBlock(block3);
 		System.out.println("\nWalletA's balance is: " + walletA.getBalance(UTXOs));
 		System.out.println("WalletB's balance is: " + walletB.getBalance(UTXOs));
-		
-		
+
+		isChainValid();
+
 //		System.out.println("Private and public keys: ");
 //		System.out.println(StringUtil.getStringFromKey(walletA.privateKey));
 //		System.out.println(StringUtil.getStringFromKey(walletA.publicKey));
@@ -71,7 +73,7 @@ public class Test {
 //		transaction.generateSignature(walletA.privateKey);
 //		System.out.println("Is signature verified");
 //		System.out.println(transaction.verifySignature());
-		
+
 //		try {
 //			Block genesisBlock = new Block("first block", "0");
 //			System.out.println("Trying to Mine block 1");
@@ -97,82 +99,92 @@ public class Test {
 //			System.out.println(e);
 //		}
 	}
-	
+
 	public static Boolean isChainValid() {
 
-		Block currentBlock; 
+		Block currentBlock;
 		Block previousBlock;
 		String hashTarget = new String(new char[difficulty]).replace('\0', '0');
-		HashMap<String,TransactionOutput> tempUTXOs = new HashMap<String,TransactionOutput>();
+		HashMap<String, TransactionOutput> tempUTXOs = new HashMap<String, TransactionOutput>();
 		tempUTXOs.put(genesisTransaction.outputs.get(0).id, genesisTransaction.outputs.get(0));
-		
-		for(int i=1; i < blockchain.size(); i++) {
+
+		for (int i = 1; i < blockchain.size(); i++) {
 			currentBlock = blockchain.get(i);
-			previousBlock = blockchain.get(i-1);
-			
-			if(!currentBlock.hash.equals(currentBlock.calculateHash()) ){
+			previousBlock = blockchain.get(i - 1);
+
+			// 현재 블록의 데이터의 해시값이 저장된 해시값과 일치하는지 확인
+			if (!currentBlock.hash.equals(currentBlock.calculateHash())) {
 				System.out.println("#Current Hashes not equal");
 				return false;
 			}
-			
-			if(!previousBlock.hash.equals(currentBlock.previousHash) ) {
+
+			// 이전 블록의 해시값이 현재 블록에 저장된 해시값과 같은지 확인
+			if (!previousBlock.hash.equals(currentBlock.previousHash)) {
 				System.out.println("#Previous Hashes not equal");
 				return false;
 			}
-			
-			if(!currentBlock.hash.substring( 0, difficulty).equals(hashTarget)) {
+
+			// 마이닝 난이도 조건에 맞는 해시값인지 확인
+			if (!currentBlock.hash.substring(0, difficulty).equals(hashTarget)) {
 				System.out.println("#This block hasn't been mined");
 				return false;
 			}
-			
+
 			TransactionOutput tempOutput;
-			for(int t=0; t <currentBlock.transactions.size(); t++) {
+			for (int t = 0; t < currentBlock.transactions.size(); t++) {
 				Transaction currentTransaction = currentBlock.transactions.get(t);
-				
-				if(!currentTransaction.verifySignature()) {
+
+				// 해당 트랜잭션이 sender가 생성한 게 맞는지 확인
+				if (!currentTransaction.verifySignature()) {
 					System.out.println("#Signature on Transaction(" + t + ") is Invalid");
-					return false; 
+					return false;
 				}
-				if(currentTransaction.getInputsValue() != currentTransaction.getOutputsValue()) {
-					System.out.println("#Inputs are note equal to outputs on Transaction(" + t + ")");
-					return false; 
+
+				// 트랜잭션에서 전송한 금액이 전송받은 금액과 같은지 확인
+				if (currentTransaction.getInputsValue() != currentTransaction.getOutputsValue()) {
+					System.out.println("#Inputs are not equal to outputs on Transaction(" + t + ")");
+					return false;
 				}
-				
-				for(TransactionInput input: currentTransaction.inputs) {	
+
+				// 트랜잭션 전송 건 별로 맞는 금액이 전송되었는지 확인
+				for (TransactionInput input : currentTransaction.inputs) {
 					tempOutput = tempUTXOs.get(input.transactionOutputId);
-					
-					if(tempOutput == null) {
+
+					if (tempOutput == null) {
 						System.out.println("#Referenced input on Transaction(" + t + ") is Missing");
 						return false;
 					}
-					
-					if(input.UTXO.value != tempOutput.value) {
+
+					if (input.UTXO.value != tempOutput.value) {
 						System.out.println("#Referenced input Transaction(" + t + ") value is Invalid");
 						return false;
 					}
-					
+
 					tempUTXOs.remove(input.transactionOutputId);
 				}
-				
-				for(TransactionOutput output: currentTransaction.outputs) {
+
+				for (TransactionOutput output : currentTransaction.outputs) {
 					tempUTXOs.put(output.id, output);
 				}
-				
-				if( currentTransaction.outputs.get(0).recipient != currentTransaction.recipient) {
+
+				// 현재 트랜잭션의 수취인이 수취한 게 맞는지 확인
+				if (currentTransaction.outputs.get(0).recipient != currentTransaction.recipient) {
 					System.out.println("#Transaction(" + t + ") output reciepient is not who it should be");
 					return false;
 				}
-				if( currentTransaction.outputs.get(1).recipient != currentTransaction.sender) {
+
+				// 현재 트랜잭션의 발송자가 발송한 게 맞는지 확인
+				if (currentTransaction.outputs.get(1).recipient != currentTransaction.sender) {
 					System.out.println("#Transaction(" + t + ") output 'change' is not sender.");
 					return false;
 				}
-				
+
 			}
-			
+
 		}
 		System.out.println("Blockchain is valid");
 		return true;
-		
+
 //		Block currentBlock;
 //		Block previousBlock;
 //		
@@ -188,7 +200,7 @@ public class Test {
 //		
 //		return true;
 	}
-	
+
 	public static void addBlock(Block newBlock) {
 		newBlock.mineBlock(difficulty);
 		blockchain.add(newBlock);
